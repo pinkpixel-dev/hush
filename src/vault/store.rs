@@ -79,6 +79,14 @@ pub fn open(paths: &Paths) -> Result<(Vault, Key)> {
     Ok((parse(&plaintext)?, key))
 }
 
+/// Decrypts the vault with a key that's already unlocked, without prompting.
+/// The TUI keeps its key for the session and reopens with this before edits.
+pub fn open_with(paths: &Paths, key: &Key) -> Result<Vault> {
+    check(paths)?;
+    let ciphertext = fs::read(paths.vault()).context("couldn't read the vault")?;
+    parse(&crypto::decrypt(key, &ciphertext)?)
+}
+
 /// Reads decrypted vault JSON. A newer format is refused, since saving it
 /// with this build would silently drop whatever the newer one added.
 fn parse(plaintext: &[u8]) -> Result<Vault> {

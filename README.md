@@ -102,6 +102,7 @@ Values come in exactly as written. Some dotenv loaders expand `$VAR` or `${VAR}`
 | `hush recovery-key` | Make a recovery key for a keychain vault. `--replace` swaps it for a new one |
 | `hush recover` | Unlock the vault with its recovery key and put a new key in your keychain. `--from <file>` rebuilds from a copy of `vault.age` |
 | `hush doctor` | Check the vault folder, its files, the config, and the key, and say what's wrong |
+| `hush ui` | Browse and edit everything in a terminal UI |
 | `hush completions <shell>` | Print a completion script for `bash`, `zsh`, `fish`, `elvish`, or `powershell` |
 
 Values are never accepted as command arguments, so they don't end up in your shell history. To set one from a script, pipe it in:
@@ -123,6 +124,35 @@ hush list --project blog
 ```
 
 Environment names are free-form, so `staging` or `test` work too.
+
+### The terminal UI
+
+```bash
+hush ui
+```
+
+`hush ui` shows your projects, environments, and secrets side by side, and lets you add, edit, rename, and delete them without remembering the flags. It opens on the project linked to the current folder. Values stay masked as `••••••••••••` until you ask to see one, and they hide again as soon as you move to another secret.
+
+| Key | What it does |
+|---|---|
+| `↑` `↓` or `j` `k` | Move through the list |
+| `←` `→`, `h` `l`, or `Tab` | Switch between projects, environments, and secrets |
+| `Enter` | Show the selected value |
+| `a` | Add a secret. From the projects or environments pane, this starts a new project or environment |
+| `e` | Give the selected secret a new value |
+| `r` / `d` | Rename or delete whatever is selected |
+| `c` | Copy the selected environment, like `dev` into a new `staging` |
+| `/` | Filter the secrets by name |
+| `?` / `q` | Help / quit |
+
+The mouse works too. Click a row to select it, click a selected secret to show its value, scroll to move, and click the hints at the bottom to run them. Deleting a secret asks first, and deleting a whole environment or project makes you type its name.
+
+A few things worth knowing:
+
+- Pasting a value works the way you'd hope, including multi-line ones like PEM keys.
+- Every edit is saved right away, the same way `hush set` saves. If another terminal changes the vault while the UI is open, the UI picks up the change on its own.
+- After 5 minutes without input, the UI locks. It forgets the decrypted vault and shows a lock screen. Keychain vaults unlock with `Enter`, and passphrase vaults ask for the passphrase again. Set `HUSH_UI_TIMEOUT` to a number of minutes to change that, or `0` to turn it off.
+- With a passphrase vault, each save takes a second or so, because hush re-encrypts the whole vault every time.
 
 ### When a tool needs a real .env file
 
@@ -214,6 +244,7 @@ New passphrases need at least 12 characters. hush asks for the passphrase each t
 |---|---|
 | `HUSH_DIR` | Use a different vault folder. The default is `~/.local/share/hush` |
 | `HUSH_PASSPHRASE` | Passphrase for a passphrase vault, so you don't get prompted |
+| `HUSH_UI_TIMEOUT` | Minutes of no input before `hush ui` locks. The default is `5`, and `0` turns the lock off |
 
 ## When something's off
 
@@ -235,6 +266,8 @@ hush is strict about the vault folder, and it refuses to work in these cases:
 hush keeps secrets out of plaintext files. That covers the usual ways `.env` files leak: getting committed to git, landing in backups or synced folders, showing up in a screen share, or getting read by an AI agent browsing your project.
 
 It doesn't protect you from malware running as your own user while you're logged in. That code could ask the keychain for the key the same way hush does. Once your app is running, its environment is also readable by your user (through `/proc/<pid>/environ` on Linux). So it's a big step up from `.env` files, but it isn't a sandbox.
+
+On Linux, hush marks its own process as non-dumpable. A crash doesn't write decrypted secrets into a core dump, and other programs running as you can't read hush's memory through `/proc`. That matters most for `hush ui`, which keeps the vault open while you use it. The app that `hush run` starts is a normal process again, so this doesn't change anything about how your app runs or crashes.
 
 Two other behaviors are worth knowing:
 

@@ -36,6 +36,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         Command::RecoveryKey { replace } => recovery::create(&paths, replace),
         Command::Recover { from } => recovery::recover(&paths, from.as_deref()),
         Command::Doctor => doctor::run(&paths),
+        Command::Ui => crate::tui::run(paths),
         Command::Completions { .. } => unreachable!("handled above"),
     }
 }

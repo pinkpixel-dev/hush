@@ -100,6 +100,8 @@ pub enum Command {
     },
     /// Check the vault folder, files, config, and key for problems
     Doctor,
+    /// Browse and edit secrets in a terminal UI
+    Ui,
     /// Print a shell completion script
     Completions {
         shell: clap_complete::Shell,

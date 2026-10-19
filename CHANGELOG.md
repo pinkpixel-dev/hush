@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 - Unreleased
+
+### 🖥️ Terminal UI
+
+- New `hush ui` command: a terminal UI with your projects, environments, and secrets side by side. It opens on the project linked to the current folder
+- Add, edit, rename, and delete secrets, plus rename, delete, and copy whole environments and projects. Deleting an environment or project asks you to type its name
+- Values stay masked until you show one, and hide again when the selection moves
+- Works with the keyboard and the mouse: click to select, click again to show a value, scroll, and click the hints in the footer
+- Pasting values works, including multi-line ones
+- Every edit saves right away, the same way the CLI does, and changes made from another terminal show up on their own
+- Locks after 5 minutes without input and forgets the decrypted vault. Set `HUSH_UI_TIMEOUT` (in minutes, `0` for never) to change it
+- Opens with a small hush splash screen, and the lock screen shows it too
+
+### 🔒 Hardening
+
+- On Linux, hush now marks its process as non-dumpable, so decrypted secrets stay out of core dumps and other processes running as you can't read its memory through `/proc`. The command `hush run` starts isn't affected
+
 ## 0.4.1 - October 19, 2026
 
 ### 🐛 Fixes
