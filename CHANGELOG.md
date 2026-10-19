@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 - October 19, 2026
 
 ### 🩺 Commands
 
