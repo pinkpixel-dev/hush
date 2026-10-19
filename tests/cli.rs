@@ -176,3 +176,21 @@ fn completions_work_without_a_vault() {
             .stdout(predicate::str::contains("recovery-key").and(predicate::str::contains("import")));
     }
 }
+
+#[test]
+fn export_round_trips_through_import() {
+    let s = Sandbox::new();
+    let values = [("PLAIN", "sk-123"), ("SPACES", "a b # c"), ("DOLLAR", "$HOME 'x' \"y\""), ("MULTI", "one\ntwo")];
+    for (key, value) in values {
+        s.set(&["set", key], value);
+    }
+
+    let exported = s.hush(&["export"]).assert().success();
+    fs::write(s.project.path().join("out.env"), &exported.get_output().stdout).unwrap();
+    s.hush(&["import", "out.env", "--env", "copy"]).assert().success();
+    for (key, value) in values {
+        s.hush(&["get", key, "--env", "copy"]).assert().success().stdout(format!("{value}\n"));
+    }
+
+    s.hush(&["export", "--env", "empty"]).assert().failure().stderr(predicate::str::contains("no secrets"));
+}

@@ -4,6 +4,7 @@
 
 ### 🩺 Commands
 
+- New `hush export` command that prints a project's secrets in `.env` format on stdout, for tools that only read a file. hush never writes the file itself. Values are quoted so `hush import` reads them back exactly, including spaces, quotes, `$`, and line breaks
 - New `hush doctor` command. It checks the vault folder, its files, the config, and whether your key opens the vault, then prints one line per check. It's read-only and exits with an error when something's actually broken
 
 ### 🔒 Hardening

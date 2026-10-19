@@ -69,6 +69,7 @@ hush never deletes your files for you.
 | `hush rm <KEY>` | Remove a secret |
 | `hush run -- <cmd>` | Run a command with the secrets in its environment |
 | `hush import <file>` | Copy every variable from a `.env` file into the vault |
+| `hush export` | Print the project's secrets in `.env` format, for tools that insist on reading a file |
 | `hush scan [dir]` | Find `.env` files on disk (defaults to your home folder) |
 | `hush recovery-key` | Make a recovery key for a keychain vault. `--replace` swaps it for a new one |
 | `hush recover` | Unlock the vault with its recovery key and put a new key in your keychain. `--from <file>` rebuilds from a copy of `vault.age` |
@@ -94,6 +95,19 @@ hush list --project blog
 ```
 
 Environment names are free-form, so `staging` or `test` work too.
+
+### When a tool needs a real .env file
+
+Some tools only read a `.env` file and won't take environment variables. `hush export` prints the current project's secrets in `.env` format, and you decide where they go:
+
+```bash
+hush export > .env
+hush export --env prod > .env.production
+```
+
+hush never writes that file itself, since the whole point is not having plaintext secrets lying around. If you do write one, delete it when you're done, and keep it out of git.
+
+Values with spaces, quotes, `$`, or line breaks get quoted so `hush import` and other dotenv parsers read them back exactly. Tools that take a file literally (like `docker run --env-file`, as far as I know) will see those quotes as part of the value, so `hush run` is the better fit there.
 
 ### Finding old .env files
 

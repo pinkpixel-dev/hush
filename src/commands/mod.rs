@@ -1,4 +1,5 @@
 mod doctor;
+mod export;
 mod import;
 mod init;
 mod link;
@@ -30,6 +31,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         Command::Rm { key, target } => secrets::rm(&paths, &key, target),
         Command::Run { target, command } => run::run(&paths, target, &command),
         Command::Import { file, target } => import::run(&paths, &file, target),
+        Command::Export { target } => export::run(&paths, target),
         Command::Scan { dir } => scan::run(dir),
         Command::RecoveryKey { replace } => recovery::create(&paths, replace),
         Command::Recover { from } => recovery::recover(&paths, from.as_deref()),

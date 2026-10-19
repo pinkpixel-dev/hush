@@ -76,6 +76,11 @@ pub enum Command {
         #[command(flatten)]
         target: Target,
     },
+    /// Print secrets in .env format (redirect it to a file yourself)
+    Export {
+        #[command(flatten)]
+        target: Target,
+    },
     /// Find .env files on disk
     Scan {
         /// Folder to search (defaults to your home folder)
