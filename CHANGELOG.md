@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.1.1 - October 19, 2026
+## 0.2.0 - October 19, 2026
+
+### 🔑 Recovery
+
+- New `hush recovery-key` command. It prints a recovery key once, and from then on every save also encrypts the vault to that key
+- New `hush recover` command. If your keychain entry is lost, it unlocks the vault with the recovery key and stores a fresh key in your keychain
+- `hush recover --from <file>` rebuilds the vault folder from a copy of `vault.age`, for a new machine or a wiped folder. It won't overwrite an existing vault
+- `hush init` now suggests making a recovery key, and the "key is missing from your keychain" error points to `hush recover`
 
 ### 🐛 Fixes
 

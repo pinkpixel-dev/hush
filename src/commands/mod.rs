@@ -1,6 +1,7 @@
 mod import;
 mod init;
 mod link;
+mod recovery;
 mod run;
 mod scan;
 mod secrets;
@@ -23,6 +24,8 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         Command::Run { target, command } => run::run(&paths, target, &command),
         Command::Import { file, target } => import::run(&paths, &file, target),
         Command::Scan { dir } => scan::run(dir),
+        Command::RecoveryKey { replace } => recovery::create(&paths, replace),
+        Command::Recover { from } => recovery::recover(&paths, from.as_deref()),
     }
 }
 

@@ -81,4 +81,16 @@ pub enum Command {
         /// Folder to search (defaults to your home folder)
         dir: Option<PathBuf>,
     },
+    /// Make a recovery key that can unlock the vault if the keychain entry is lost
+    RecoveryKey {
+        /// Replace the existing recovery key (the old one stops working)
+        #[arg(long)]
+        replace: bool,
+    },
+    /// Unlock the vault with its recovery key and store a new key in the keychain
+    Recover {
+        /// Rebuild from a copy of vault.age (for a new machine or a wiped vault folder)
+        #[arg(long)]
+        from: Option<PathBuf>,
+    },
 }

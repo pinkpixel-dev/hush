@@ -9,6 +9,8 @@ use predicates::prelude::*;
 use tempfile::TempDir;
 
 const PASSPHRASE: &str = "correct horse battery staple";
+/// A valid age identity that doesn't unlock any test vault.
+const WRONG_RECOVERY_KEY: &str = "AGE-SECRET-KEY-1GQ9778VQXMMJVE8SK7J6VT8UJ4HDQAJUVSFCWCM02D8GEWQ72PVQ2Y5J33";
 
 struct Sandbox {
     data: TempDir,
@@ -147,4 +149,48 @@ fn scan_finds_env_files_and_skips_noise() {
                 .and(predicate::str::contains("example").not())
                 .and(predicate::str::contains("node_modules").not()),
         );
+}
+
+#[test]
+fn passphrase_vaults_reject_recovery_keys() {
+    let s = Sandbox::new();
+    s.hush(&["recovery-key"]).assert().failure().stderr(predicate::str::contains("don't use recovery keys"));
+    s.hush(&["recover"])
+        .write_stdin(WRONG_RECOVERY_KEY)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("don't use recovery keys"));
+}
+
+#[test]
+fn recover_from_never_overwrites_an_existing_vault() {
+    let s = Sandbox::new();
+    let before = fs::read(s.data.path().join("vault.age")).unwrap();
+    s.hush(&["recover", "--from", "elsewhere.age"])
+        .write_stdin(WRONG_RECOVERY_KEY)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+    assert_eq!(fs::read(s.data.path().join("vault.age")).unwrap(), before);
+}
+
+#[test]
+fn recover_with_the_wrong_key_writes_nothing() {
+    let s = Sandbox::new();
+    let empty = TempDir::new().unwrap();
+    let copy = s.data.path().join("vault.age");
+    s.hush(&["recover", "--from", copy.to_str().unwrap()])
+        .env("HUSH_DIR", empty.path())
+        .write_stdin(WRONG_RECOVERY_KEY)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("doesn't unlock"));
+    assert_eq!(fs::read_dir(empty.path()).unwrap().count(), 0, "a failed recover left files behind");
+
+    s.hush(&["recover", "--from", copy.to_str().unwrap()])
+        .env("HUSH_DIR", empty.path())
+        .write_stdin("not a key")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("isn't a valid recovery key"));
 }

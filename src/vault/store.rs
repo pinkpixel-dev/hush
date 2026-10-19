@@ -2,7 +2,8 @@ use std::fs;
 use std::io::Write;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use age::x25519;
+use anyhow::{Context, Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
@@ -21,6 +22,27 @@ pub enum Mode {
 #[derive(Serialize, Deserialize)]
 struct Config {
     mode: Mode,
+    /// Public half of the recovery key. Keychain vaults are also encrypted to it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    recovery: Option<String>,
+}
+
+impl Config {
+    fn read(paths: &Paths) -> Result<Self> {
+        let bytes = fs::read(paths.config()).with_context(|| format!("couldn't read {}", paths.config().display()))?;
+        serde_json::from_slice(&bytes).context("the hush config file is damaged")
+    }
+
+    fn write(&self, paths: &Paths) -> Result<()> {
+        write_atomic(&paths.config(), &serde_json::to_vec_pretty(self)?)
+    }
+
+    fn recovery(&self) -> Result<Option<x25519::Recipient>> {
+        self.recovery
+            .as_deref()
+            .map(|r| r.parse().map_err(|e| anyhow!("the recovery key in the hush config is damaged ({e})")))
+            .transpose()
+    }
 }
 
 pub fn create(paths: &Paths, mode: Mode) -> Result<()> {
@@ -32,8 +54,7 @@ pub fn create(paths: &Paths, mode: Mode) -> Result<()> {
         Mode::Keychain => keychain::create_identity(paths)?,
         Mode::Passphrase => Key::Passphrase(keychain::new_passphrase()?),
     };
-    let config = serde_json::to_vec_pretty(&Config { mode })?;
-    write_atomic(&paths.config(), &config)?;
+    Config { mode, recovery: None }.write(paths)?;
     save(paths, &Vault::new(), &key)
 }
 
@@ -41,10 +62,7 @@ pub fn open(paths: &Paths) -> Result<(Vault, Key)> {
     if !paths.vault().exists() {
         bail!("no vault yet. Run `hush init` first");
     }
-    let config: Config = serde_json::from_slice(
-        &fs::read(paths.config()).with_context(|| format!("couldn't read {}", paths.config().display()))?,
-    )
-    .context("the hush config file is damaged")?;
+    let config = Config::read(paths)?;
     let key = match config.mode {
         Mode::Keychain => keychain::load_identity(paths)?,
         Mode::Passphrase => Key::Passphrase(keychain::passphrase()?),
@@ -76,8 +94,65 @@ pub fn lock(paths: &Paths) -> Result<VaultLock> {
 
 pub fn save(paths: &Paths, vault: &Vault, key: &Key) -> Result<()> {
     let plaintext = Zeroizing::new(serde_json::to_vec(vault)?);
-    let ciphertext = crypto::encrypt(key, &plaintext)?;
+    let ciphertext = crypto::encrypt(key, Config::read(paths)?.recovery()?.as_ref(), &plaintext)?;
     write_atomic(&paths.vault(), &ciphertext)
+}
+
+/// Gives a keychain vault a new recovery key and returns it. The caller holds
+/// the vault lock. Refuses to replace an existing key unless `replace` is set,
+/// since that makes the old key useless for future saves.
+pub fn add_recovery(paths: &Paths, replace: bool) -> Result<x25519::Identity> {
+    let mut config = Config::read(paths)?;
+    if config.mode == Mode::Passphrase {
+        bail!("passphrase vaults don't use recovery keys. Your passphrase already unlocks the vault anywhere");
+    }
+    if config.recovery.is_some() && !replace {
+        bail!("this vault already has a recovery key. Use `--replace` to make a new one (the old one stops working)");
+    }
+    let (vault, key) = open(paths)?;
+    let recovery = x25519::Identity::generate();
+    config.recovery = Some(recovery.to_public().to_string());
+    config.write(paths)?;
+    save(paths, &vault, &key)?;
+    Ok(recovery)
+}
+
+/// Unlocks a vault with its recovery key, puts a fresh key in the keychain, and
+/// re-encrypts. With `from`, rebuilds the vault folder from a copied `vault.age`.
+/// The vault is written last, so if anything fails partway the old vault still
+/// opens with the recovery key and you can run this again.
+pub fn recover(paths: &Paths, from: Option<&Path>, recovery: x25519::Identity) -> Result<usize> {
+    let source = match from {
+        Some(file) => {
+            if paths.vault().exists() {
+                bail!(
+                    "a vault already exists at {}. Move it aside first, hush won't overwrite it",
+                    paths.vault().display()
+                );
+            }
+            file.to_path_buf()
+        }
+        None => {
+            if Config::read(paths)?.mode == Mode::Passphrase {
+                bail!("passphrase vaults don't use recovery keys. Unlock it with your passphrase");
+            }
+            paths.vault()
+        }
+    };
+    let vault = unlock_with_recovery(&source, &recovery)?;
+
+    create_private_dir(&paths.dir)?;
+    let key = keychain::create_identity(paths)?;
+    Config { mode: Mode::Keychain, recovery: Some(recovery.to_public().to_string()) }.write(paths)?;
+    save(paths, &vault, &key)?;
+    Ok(vault.projects.len())
+}
+
+fn unlock_with_recovery(file: &Path, recovery: &x25519::Identity) -> Result<Vault> {
+    let ciphertext = fs::read(file).with_context(|| format!("couldn't read {}", file.display()))?;
+    let plaintext = crypto::decrypt(&Key::Identity(recovery.clone()), &ciphertext)
+        .map_err(|_| anyhow!("that recovery key doesn't unlock {}", file.display()))?;
+    serde_json::from_slice(&plaintext).context("the vault decrypted but its contents are damaged")
 }
 
 /// Writes to a temp file and renames it over the target, so a crash mid-write
@@ -111,4 +186,31 @@ fn create_private_dir(dir: &Path) -> Result<()> {
         fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn old_configs_without_recovery_still_load() {
+        let config: Config = serde_json::from_slice(br#"{ "mode": "keychain" }"#).unwrap();
+        assert!(config.recovery().unwrap().is_none());
+    }
+
+    #[test]
+    fn recovery_key_unlocks_a_vault_file() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let file = dir.path().join("vault.age");
+        let recovery = x25519::Identity::generate();
+        let mut vault = Vault::new();
+        vault.secrets_mut("app", "dev").insert("A".into(), "1".into());
+        let plaintext = serde_json::to_vec(&vault).unwrap();
+        let main = Key::Identity(x25519::Identity::generate());
+        fs::write(&file, crypto::encrypt(&main, Some(&recovery.to_public()), &plaintext).unwrap()).unwrap();
+
+        let restored = unlock_with_recovery(&file, &recovery).unwrap();
+        assert_eq!(restored.secrets("app", "dev").unwrap()["A"], "1");
+        assert!(unlock_with_recovery(&file, &x25519::Identity::generate()).is_err());
+    }
 }

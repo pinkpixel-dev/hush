@@ -40,6 +40,7 @@ hush is Linux-first. I've only tested it on Linux so far. The keychain code shou
 
 ```bash
 hush init                        # create the vault, key goes in your keychain
+hush recovery-key                # print a recovery key, save it somewhere safe
 cd ~/projects/my-app
 hush link my-app                 # writes a .hush file in this folder
 hush set OPENAI_API_KEY          # hidden prompt for the value
@@ -69,6 +70,8 @@ hush never deletes your files for you.
 | `hush run -- <cmd>` | Run a command with the secrets in its environment |
 | `hush import <file>` | Copy every variable from a `.env` file into the vault |
 | `hush scan [dir]` | Find `.env` files on disk (defaults to your home folder) |
+| `hush recovery-key` | Make a recovery key for a keychain vault. `--replace` swaps it for a new one |
+| `hush recover` | Unlock the vault with its recovery key and put a new key in your keychain. `--from <file>` rebuilds from a copy of `vault.age` |
 
 Values are never accepted as command arguments, so they don't end up in your shell history. To set one from a script, pipe it in:
 
@@ -98,6 +101,40 @@ hush scan ~/projects
 
 This prints every `.env` and `.env.*` file it finds, along with how many variables each one holds. It skips templates like `.env.example` and folders like `node_modules`, `.git`, and `target`.
 
+## Recovery
+
+In keychain mode, the only key that opens the vault normally lives in your keychain. If that entry gets wiped (a reinstall, a reset keyring, a new machine), the vault is just random bytes. A recovery key fixes that:
+
+```bash
+hush recovery-key
+```
+
+This prints a key starting with `AGE-SECRET-KEY-1`. It's shown once and hush doesn't keep a copy, so put it somewhere that isn't this machine. A password manager is a good spot. From then on, every save encrypts the vault to both your keychain key and the recovery key.
+
+If the keychain entry goes missing, run this and paste the key at the prompt:
+
+```bash
+hush recover
+```
+
+hush unlocks the vault with the recovery key, stores a fresh key in your keychain, and re-encrypts. Your recovery key keeps working afterward.
+
+### Backing up the vault file
+
+The recovery key only helps if you still have the vault. `vault.age` (in `~/.local/share/hush` by default) is encrypted, so it's safe to copy into whatever backup or sync tool you already use. On a new machine, or after the folder is gone, rebuild from that copy:
+
+```bash
+hush recover --from ~/backups/vault.age
+```
+
+This sets up the whole vault folder from the copy. It refuses to run if a vault already exists, so it can't overwrite one by accident.
+
+A couple of things to know:
+
+- `hush recovery-key --replace` makes a new key and the old one stops working for future saves. Older copies of `vault.age` in your backups can still be opened with the old key, though, so treat the old one as sensitive until those copies are gone.
+- Anyone with your recovery key and a copy of `vault.age` can read every secret in it.
+- Passphrase vaults don't have recovery keys (age can't encrypt to a passphrase and a key at the same time). Your passphrase already unlocks the vault anywhere, so back up `vault.age` and `config.json` and remember the passphrase.
+
 ## Passphrase mode
 
 If there's no keychain available (SSH sessions, WSL, CI, a minimal window manager without a Secret Service), create a passphrase vault instead:
@@ -124,7 +161,7 @@ It doesn't protect you from malware running as your own user while you're logged
 Two other behaviors are worth knowing:
 
 - If a variable is already set in your shell, the vault value wins for the command `hush run` starts.
-- Losing the keychain entry means losing the vault. For now there's no backup or export command, so a passphrase vault is the safer choice if that worries you.
+- Losing the keychain entry without a recovery key means losing the vault. Run `hush recovery-key` once after `hush init`.
 
 ## Development
 
@@ -134,7 +171,7 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
-The tests run every command end to end against real passphrase vaults in temp folders. The keychain path can't run headless, so I test it by hand.
+The tests run every command end to end against real passphrase vaults in temp folders. The keychain path can't run headless, so I test it by hand (including deleting the keychain entry and running `hush recover`).
 
 ## License
 

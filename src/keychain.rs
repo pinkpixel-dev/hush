@@ -32,7 +32,7 @@ pub fn create_identity(paths: &Paths) -> Result<Key> {
 pub fn load_identity(paths: &Paths) -> Result<Key> {
     let stored = entry(paths)?.get_password().map_err(|e| match e {
         keyring::Error::NoEntry => anyhow!(
-            "the key for this vault is missing from your keychain, so it can't be unlocked"
+            "the key for this vault is missing from your keychain. If you made a recovery key, run `hush recover`"
         ),
         e => keychain_error(e),
     })?;
