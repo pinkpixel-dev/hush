@@ -72,6 +72,7 @@ hush never deletes your files for you.
 | `hush scan [dir]` | Find `.env` files on disk (defaults to your home folder) |
 | `hush recovery-key` | Make a recovery key for a keychain vault. `--replace` swaps it for a new one |
 | `hush recover` | Unlock the vault with its recovery key and put a new key in your keychain. `--from <file>` rebuilds from a copy of `vault.age` |
+| `hush doctor` | Check the vault folder, its files, the config, and the key, and say what's wrong |
 | `hush completions <shell>` | Print a completion script for `bash`, `zsh`, `fish`, `elvish`, or `powershell` |
 
 Values are never accepted as command arguments, so they don't end up in your shell history. To set one from a script, pipe it in:
@@ -172,6 +173,21 @@ hush asks for the passphrase each time it opens the vault. For scripts, you can 
 | `HUSH_DIR` | Use a different vault folder. The default is `~/.local/share/hush` |
 | `HUSH_PASSPHRASE` | Passphrase for a passphrase vault, so you don't get prompted |
 
+## When something's off
+
+Run this first:
+
+```bash
+hush doctor
+```
+
+It prints one line per check: the vault folder and its permissions, `vault.age` and `config.json`, the config itself, whether your key actually opens the vault, any temp files left over from an interrupted write, and which project the current folder is linked to. It never changes anything, and it exits with an error if it finds a real problem. For a passphrase vault it asks for the passphrase (or uses `HUSH_PASSPHRASE`) so it can test the unlock.
+
+hush is strict about the vault folder, and it refuses to work in these cases:
+
+- The folder can be read or written by other users. hush creates it as `0700`, so this usually means something changed it. The error includes the `chmod 700` command that fixes it.
+- The folder, `vault.age`, `config.json`, or `vault.lock` is a symlink. If you keep the vault somewhere else (a synced folder, say), point `HUSH_DIR` at the real location instead of symlinking it.
+
 ## What it protects (and what it doesn't)
 
 hush keeps secrets out of plaintext files. That covers the usual ways `.env` files leak: getting committed to git, landing in backups or synced folders, showing up in a screen share, or getting read by an AI agent browsing your project.
@@ -191,7 +207,13 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
-The tests run every command end to end against real passphrase vaults in temp folders. The keychain path can't run headless, so I test it by hand (including deleting the keychain entry and running `hush recover`).
+The tests run every command end to end against real passphrase vaults in temp folders. That includes parallel writers, symlinks, folder permissions, and recoveries that fail partway.
+
+The keychain tests need a running Secret Service, so they're opt-in. Each one uses its own temp vault and deletes its keychain entry afterward, so your real vault isn't touched:
+
+```bash
+cargo test --test keychain -- --ignored
+```
 
 ## License
 

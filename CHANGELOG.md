@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### 🩺 Commands
+
+- New `hush doctor` command. It checks the vault folder, its files, the config, and whether your key opens the vault, then prints one line per check. It's read-only and exits with an error when something's actually broken
+
+### 🔒 Hardening
+
+- hush now refuses to use a vault folder that other users can read or write, and tells you the `chmod 700` command that fixes it
+- hush refuses symlinks for the vault folder, `vault.age`, `config.json`, and `vault.lock`, so it can't be pointed at files somewhere else
+- Temp files are created fresh every time and never follow a symlink, and the folder is synced after each rename so a save survives a power cut
+
+### 🐛 Fixes
+
+- Running `hush init` twice at the same time could create two vaults, with the second one silently replacing the first. `init` now takes the vault lock, so the second run fails with "a vault already exists"
+- `hush recover --from` now takes the vault lock too
+
 ## 0.3.0 - October 19, 2026
 
 ### ⌨️ Commands

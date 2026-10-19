@@ -1,5 +1,4 @@
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 
 use age::x25519;
@@ -9,6 +8,7 @@ use zeroize::Zeroizing;
 
 use super::Vault;
 use super::crypto::{self, Key};
+use super::files::{self, create_private_dir, write_atomic};
 use crate::keychain;
 use crate::paths::Paths;
 
@@ -50,6 +50,12 @@ pub fn create(paths: &Paths, mode: Mode) -> Result<()> {
         bail!("a vault already exists at {}", paths.vault().display());
     }
     create_private_dir(&paths.dir)?;
+    check(paths)?;
+    let _lock = acquire(paths)?;
+    // Another `hush init` may have finished while this one waited for the lock.
+    if paths.vault().exists() {
+        bail!("a vault already exists at {}", paths.vault().display());
+    }
     let key = match mode {
         Mode::Keychain => keychain::create_identity(paths)?,
         Mode::Passphrase => Key::Passphrase(keychain::new_passphrase()?),
@@ -59,6 +65,7 @@ pub fn create(paths: &Paths, mode: Mode) -> Result<()> {
 }
 
 pub fn open(paths: &Paths) -> Result<(Vault, Key)> {
+    check(paths)?;
     if !paths.vault().exists() {
         bail!("no vault yet. Run `hush init` first");
     }
@@ -79,10 +86,17 @@ pub fn open(paths: &Paths) -> Result<(Vault, Key)> {
 pub struct VaultLock(#[allow(dead_code)] fs::File);
 
 pub fn lock(paths: &Paths) -> Result<VaultLock> {
+    check(paths)?;
     if !paths.vault().exists() {
         bail!("no vault yet. Run `hush init` first");
     }
-    let path = paths.dir.join("vault.lock");
+    acquire(paths)
+}
+
+/// Takes the lock without requiring a vault, for commands that create one.
+/// The caller has already run `check`.
+fn acquire(paths: &Paths) -> Result<VaultLock> {
+    let path = paths.lock();
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(false);
     #[cfg(unix)]
@@ -90,6 +104,23 @@ pub fn lock(paths: &Paths) -> Result<VaultLock> {
     let file = options.open(&path).with_context(|| format!("couldn't open {}", path.display()))?;
     file.lock().context("couldn't lock the vault")?;
     Ok(VaultLock(file))
+}
+
+/// Refuses a vault folder that's a symlink or open to other users, and any
+/// symlink where hush's own files should be.
+pub fn check(paths: &Paths) -> Result<()> {
+    files::check_private_dir(&paths.dir)?;
+    for file in [paths.vault(), paths.config(), paths.lock()] {
+        files::reject_symlink(&file)?;
+    }
+    Ok(())
+}
+
+/// The vault's mode and whether it has a recovery key, without unlocking it.
+pub fn describe(paths: &Paths) -> Result<(Mode, bool)> {
+    let config = Config::read(paths)?;
+    config.recovery()?;
+    Ok((config.mode, config.recovery.is_some()))
 }
 
 pub fn save(paths: &Paths, vault: &Vault, key: &Key) -> Result<()> {
@@ -141,7 +172,20 @@ pub fn recover(paths: &Paths, from: Option<&Path>, recovery: x25519::Identity) -
     };
     let vault = unlock_with_recovery(&source, &recovery)?;
 
-    create_private_dir(&paths.dir)?;
+    // With `--from` the folder may not exist until now, so it's created and
+    // locked here. In place, the caller already checked and locked it.
+    let _lock = match from {
+        Some(_) => {
+            create_private_dir(&paths.dir)?;
+            check(paths)?;
+            let lock = acquire(paths)?;
+            if paths.vault().exists() {
+                bail!("a vault appeared at {} while recovering. hush won't overwrite it", paths.vault().display());
+            }
+            Some(lock)
+        }
+        None => None,
+    };
     let key = keychain::create_identity(paths)?;
     Config { mode: Mode::Keychain, recovery: Some(recovery.to_public().to_string()) }.write(paths)?;
     save(paths, &vault, &key)?;
@@ -153,39 +197,6 @@ fn unlock_with_recovery(file: &Path, recovery: &x25519::Identity) -> Result<Vaul
     let plaintext = crypto::decrypt(&Key::Identity(recovery.clone()), &ciphertext)
         .map_err(|_| anyhow!("that recovery key doesn't unlock {}", file.display()))?;
     serde_json::from_slice(&plaintext).context("the vault decrypted but its contents are damaged")
-}
-
-/// Writes to a temp file and renames it over the target, so a crash mid-write
-/// never leaves a half-written vault behind. The temp name includes the pid so
-/// two processes never write into the same temp file.
-fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
-    let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
-    let result = write_and_rename(&tmp, path, bytes);
-    if result.is_err() {
-        let _ = fs::remove_file(&tmp);
-    }
-    result
-}
-
-fn write_and_rename(tmp: &Path, path: &Path, bytes: &[u8]) -> Result<()> {
-    let mut options = fs::OpenOptions::new();
-    options.write(true).create(true).truncate(true);
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    let mut file = options.open(tmp).with_context(|| format!("couldn't write {}", tmp.display()))?;
-    file.write_all(bytes)?;
-    file.sync_all()?;
-    fs::rename(tmp, path).with_context(|| format!("couldn't replace {}", path.display()))
-}
-
-fn create_private_dir(dir: &Path) -> Result<()> {
-    fs::create_dir_all(dir).with_context(|| format!("couldn't create {}", dir.display()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(dir, fs::Permissions::from_mode(0o700))?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]

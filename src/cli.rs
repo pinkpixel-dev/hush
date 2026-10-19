@@ -93,6 +93,8 @@ pub enum Command {
         #[arg(long)]
         from: Option<PathBuf>,
     },
+    /// Check the vault folder, files, config, and key for problems
+    Doctor,
     /// Print a shell completion script
     Completions {
         shell: clap_complete::Shell,

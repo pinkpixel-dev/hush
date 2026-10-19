@@ -1,44 +1,14 @@
 //! End-to-end tests against a real passphrase vault in a temp directory.
-//! The keychain path can't run headless, so it's covered by manual testing.
+//! Keychain vaults are covered by the opt-in tests in `keychain.rs`.
+
+mod common;
 
 use std::fs;
 
-use assert_cmd::Command;
 use assert_cmd::cargo::cargo_bin_cmd;
+use common::{Sandbox, WRONG_RECOVERY_KEY};
 use predicates::prelude::*;
 use tempfile::TempDir;
-
-const PASSPHRASE: &str = "correct horse battery staple";
-/// A valid age identity that doesn't unlock any test vault.
-const WRONG_RECOVERY_KEY: &str = "AGE-SECRET-KEY-1GQ9778VQXMMJVE8SK7J6VT8UJ4HDQAJUVSFCWCM02D8GEWQ72PVQ2Y5J33";
-
-struct Sandbox {
-    data: TempDir,
-    project: TempDir,
-}
-
-impl Sandbox {
-    /// A fresh passphrase vault plus a project folder linked to `my-app`.
-    fn new() -> Self {
-        let sandbox = Self { data: TempDir::new().unwrap(), project: TempDir::new().unwrap() };
-        sandbox.hush(&["init", "--passphrase"]).assert().success();
-        sandbox.hush(&["link", "my-app"]).assert().success();
-        sandbox
-    }
-
-    fn hush(&self, args: &[&str]) -> Command {
-        let mut cmd = cargo_bin_cmd!("hush");
-        cmd.args(args)
-            .current_dir(self.project.path())
-            .env("HUSH_DIR", self.data.path())
-            .env("HUSH_PASSPHRASE", PASSPHRASE);
-        cmd
-    }
-
-    fn set(&self, args: &[&str], value: &str) {
-        self.hush(args).write_stdin(value).assert().success();
-    }
-}
 
 #[test]
 fn set_get_list_and_rm() {

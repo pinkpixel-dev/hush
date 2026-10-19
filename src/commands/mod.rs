@@ -1,3 +1,4 @@
+mod doctor;
 mod import;
 mod init;
 mod link;
@@ -32,6 +33,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         Command::Scan { dir } => scan::run(dir),
         Command::RecoveryKey { replace } => recovery::create(&paths, replace),
         Command::Recover { from } => recovery::recover(&paths, from.as_deref()),
+        Command::Doctor => doctor::run(&paths),
         Command::Completions { .. } => unreachable!("handled above"),
     }
 }

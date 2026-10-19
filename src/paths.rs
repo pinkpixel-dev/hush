@@ -26,4 +26,8 @@ impl Paths {
     pub fn config(&self) -> PathBuf {
         self.dir.join("config.json")
     }
+
+    pub fn lock(&self) -> PathBuf {
+        self.dir.join("vault.lock")
+    }
 }

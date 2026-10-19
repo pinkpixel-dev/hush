@@ -1,4 +1,5 @@
 pub mod crypto;
+mod files;
 pub mod store;
 
 use std::collections::BTreeMap;
