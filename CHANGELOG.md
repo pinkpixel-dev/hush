@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0 - October 19, 2026
+
+### ⌨️ Commands
+
+- New `hush completions <shell>` command that prints a completion script for bash, zsh, fish, elvish, or PowerShell. It works before `hush init` too, since it never touches the vault
+
 ## 0.2.0 - October 19, 2026
 
 ### 🔑 Recovery

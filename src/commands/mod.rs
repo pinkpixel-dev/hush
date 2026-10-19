@@ -7,12 +7,18 @@ mod scan;
 mod secrets;
 
 use anyhow::Result;
+use clap::CommandFactory;
 
 use crate::cli::{Cli, Command, Target};
 use crate::paths::Paths;
 use crate::{names, project};
 
 pub fn dispatch(cli: Cli) -> Result<()> {
+    // Completions don't touch the vault, so they work before `hush init` or without a home folder.
+    if let Command::Completions { shell } = cli.command {
+        clap_complete::generate(shell, &mut Cli::command(), "hush", &mut std::io::stdout());
+        return Ok(());
+    }
     let paths = Paths::resolve()?;
     match cli.command {
         Command::Init { passphrase } => init::run(&paths, passphrase),
@@ -26,6 +32,7 @@ pub fn dispatch(cli: Cli) -> Result<()> {
         Command::Scan { dir } => scan::run(dir),
         Command::RecoveryKey { replace } => recovery::create(&paths, replace),
         Command::Recover { from } => recovery::recover(&paths, from.as_deref()),
+        Command::Completions { .. } => unreachable!("handled above"),
     }
 }
 

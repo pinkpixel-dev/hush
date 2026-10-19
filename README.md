@@ -72,6 +72,7 @@ hush never deletes your files for you.
 | `hush scan [dir]` | Find `.env` files on disk (defaults to your home folder) |
 | `hush recovery-key` | Make a recovery key for a keychain vault. `--replace` swaps it for a new one |
 | `hush recover` | Unlock the vault with its recovery key and put a new key in your keychain. `--from <file>` rebuilds from a copy of `vault.age` |
+| `hush completions <shell>` | Print a completion script for `bash`, `zsh`, `fish`, `elvish`, or `powershell` |
 
 Values are never accepted as command arguments, so they don't end up in your shell history. To set one from a script, pipe it in:
 
@@ -100,6 +101,25 @@ hush scan ~/projects
 ```
 
 This prints every `.env` and `.env.*` file it finds, along with how many variables each one holds. It skips templates like `.env.example` and folders like `node_modules`, `.git`, and `target`.
+
+### Shell completions
+
+hush can print a completion script for your shell, so Tab fills in commands and flags. Pick the one you use:
+
+```bash
+# bash
+mkdir -p ~/.local/share/bash-completion/completions
+hush completions bash > ~/.local/share/bash-completion/completions/hush
+
+# zsh (make sure ~/.zfunc is in your fpath before compinit runs)
+mkdir -p ~/.zfunc
+hush completions zsh > ~/.zfunc/_hush
+
+# fish
+hush completions fish > ~/.config/fish/completions/hush.fish
+```
+
+Open a new shell afterward. It completes command and flag names, not project or secret names, since those would mean unlocking the vault every time you press Tab.
 
 ## Recovery
 

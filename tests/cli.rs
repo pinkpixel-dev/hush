@@ -194,3 +194,15 @@ fn recover_with_the_wrong_key_writes_nothing() {
         .failure()
         .stderr(predicate::str::contains("isn't a valid recovery key"));
 }
+
+#[test]
+fn completions_work_without_a_vault() {
+    for shell in ["bash", "zsh", "fish"] {
+        cargo_bin_cmd!("hush")
+            .args(["completions", shell])
+            .env("HUSH_DIR", "/nonexistent/hush")
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("recovery-key").and(predicate::str::contains("import")));
+    }
+}

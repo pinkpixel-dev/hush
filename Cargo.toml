@@ -1,6 +1,6 @@
 [package]
 name = "hush"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 description = "Encrypted, local-first replacement for .env files"
 license = "Apache-2.0"
@@ -10,6 +10,7 @@ authors = ["Pink Pixel <admin@pinkpixel.dev>"]
 age = "0.12.1"
 anyhow = "1.0.104"
 clap = { version = "4.6.7", features = ["derive"] }
+clap_complete = "4.6.11"
 directories = "6.0.0"
 dotenvy = "0.15.7"
 keyring = "4.2.0"

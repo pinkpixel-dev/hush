@@ -93,4 +93,8 @@ pub enum Command {
         #[arg(long)]
         from: Option<PathBuf>,
     },
+    /// Print a shell completion script
+    Completions {
+        shell: clap_complete::Shell,
+    },
 }
