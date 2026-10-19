@@ -55,6 +55,25 @@ pub fn open(paths: &Paths) -> Result<(Vault, Key)> {
     Ok((vault, key))
 }
 
+/// An exclusive lock on the vault, released when dropped. Take it before
+/// `open` in any command that saves, so two hush processes can't read the
+/// same vault and then overwrite each other's changes.
+pub struct VaultLock(#[allow(dead_code)] fs::File);
+
+pub fn lock(paths: &Paths) -> Result<VaultLock> {
+    if !paths.vault().exists() {
+        bail!("no vault yet. Run `hush init` first");
+    }
+    let path = paths.dir.join("vault.lock");
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create(true).truncate(false);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    let file = options.open(&path).with_context(|| format!("couldn't open {}", path.display()))?;
+    file.lock().context("couldn't lock the vault")?;
+    Ok(VaultLock(file))
+}
+
 pub fn save(paths: &Paths, vault: &Vault, key: &Key) -> Result<()> {
     let plaintext = Zeroizing::new(serde_json::to_vec(vault)?);
     let ciphertext = crypto::encrypt(key, &plaintext)?;
@@ -62,17 +81,26 @@ pub fn save(paths: &Paths, vault: &Vault, key: &Key) -> Result<()> {
 }
 
 /// Writes to a temp file and renames it over the target, so a crash mid-write
-/// never leaves a half-written vault behind.
+/// never leaves a half-written vault behind. The temp name includes the pid so
+/// two processes never write into the same temp file.
 fn write_atomic(path: &Path, bytes: &[u8]) -> Result<()> {
-    let tmp = path.with_extension("tmp");
+    let tmp = path.with_extension(format!("{}.tmp", std::process::id()));
+    let result = write_and_rename(&tmp, path, bytes);
+    if result.is_err() {
+        let _ = fs::remove_file(&tmp);
+    }
+    result
+}
+
+fn write_and_rename(tmp: &Path, path: &Path, bytes: &[u8]) -> Result<()> {
     let mut options = fs::OpenOptions::new();
     options.write(true).create(true).truncate(true);
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-    let mut file = options.open(&tmp).with_context(|| format!("couldn't write {}", tmp.display()))?;
+    let mut file = options.open(tmp).with_context(|| format!("couldn't write {}", tmp.display()))?;
     file.write_all(bytes)?;
     file.sync_all()?;
-    fs::rename(&tmp, path).with_context(|| format!("couldn't replace {}", path.display()))
+    fs::rename(tmp, path).with_context(|| format!("couldn't replace {}", path.display()))
 }
 
 fn create_private_dir(dir: &Path) -> Result<()> {

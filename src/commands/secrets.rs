@@ -12,6 +12,7 @@ use crate::vault::store;
 pub fn set(paths: &Paths, key: &str, target: Target) -> Result<()> {
     names::validate_key(key)?;
     let (project, env) = scope(target)?;
+    let _lock = store::lock(paths)?;
     let (mut vault, unlock) = store::open(paths)?;
     let value = read_value(key)?;
     let existed = vault.secrets_mut(&project, &env).insert(key.to_string(), value.to_string()).is_some();
@@ -60,6 +61,7 @@ pub fn list(paths: &Paths, target: Target, all: bool) -> Result<()> {
 
 pub fn rm(paths: &Paths, key: &str, target: Target) -> Result<()> {
     let (project, env) = scope(target)?;
+    let _lock = store::lock(paths)?;
     let (mut vault, unlock) = store::open(paths)?;
     if !vault.remove(&project, &env, key) {
         bail!("{key} isn't set in {project}/{env}");

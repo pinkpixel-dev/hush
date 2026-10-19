@@ -20,6 +20,7 @@ pub fn run(paths: &Paths, file: &Path, target: Target) -> Result<()> {
         bail!("no variables found in {}", file.display());
     }
 
+    let _lock = store::lock(paths)?;
     let (mut vault, unlock) = store::open(paths)?;
     let secrets = vault.secrets_mut(&project, &env);
     let (mut added, mut updated) = (0, 0);

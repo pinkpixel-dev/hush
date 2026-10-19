@@ -57,6 +57,24 @@ fn set_get_list_and_rm() {
 }
 
 #[test]
+fn concurrent_sets_keep_every_secret() {
+    let s = Sandbox::new();
+    let keys = ["KEY_A", "KEY_B", "KEY_C", "KEY_D"];
+    std::thread::scope(|scope| {
+        for key in keys {
+            let s = &s;
+            scope.spawn(move || s.set(&["set", key], "value"));
+        }
+    });
+
+    let list = s.hush(&["list"]).assert().success();
+    let stdout = String::from_utf8(list.get_output().stdout.clone()).unwrap();
+    for key in keys {
+        assert!(stdout.contains(key), "{key} was lost to a concurrent write");
+    }
+}
+
+#[test]
 fn run_injects_the_right_environment() {
     let s = Sandbox::new();
     s.set(&["set", "DB_URL"], "postgres://dev");
