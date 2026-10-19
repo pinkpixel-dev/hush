@@ -1,10 +1,14 @@
+<p align="center">
+  <img src="icon.png" alt="hush icon" width="300" height="300">
+</p>
+
 # hush
 
-hush is a small CLI that replaces `.env` files. Your secrets live in one encrypted vault on your machine, and `hush run` hands them to your app as environment variables when it starts.
+hush is a CLI that replaces `.env` files. Your secrets live in one encrypted vault on your machine, and `hush run` hands them to your app as environment variables when it starts.
 
-I made it because I had API keys sitting in plaintext `.env` files across dozens of project folders. They end up in backups and synced folders, and these days AI coding agents happily read them while poking around a repo. I wanted those keys in one encrypted place instead, without changing any app code.
+API keys sit in plaintext `.env` files across dozens of project folders. They end up in backups and synced folders, and these days AI coding agents happily read them while poking around a repo. I wanted those keys in one encrypted place instead, without changing any app code.
 
-It's local-first and free. There are no accounts or servers, and it doesn't sync anything. It's just a binary and a file.
+hush is local-first and free. There are no accounts or servers, and it doesn't sync anything. It's just a binary and a file.
 
 ## How it works
 
