@@ -1,6 +1,6 @@
 [package]
 name = "hush-env"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2024"
 rust-version = "1.89"
 description = "Encrypted, local-first replacement for .env files"
