@@ -1,10 +1,21 @@
 [package]
-name = "hush"
+name = "hush-env"
 version = "0.4.0"
 edition = "2024"
+rust-version = "1.89"
 description = "Encrypted, local-first replacement for .env files"
 license = "Apache-2.0"
 authors = ["Pink Pixel <admin@pinkpixel.dev>"]
+repository = "https://github.com/pinkpixel-dev/hush"
+homepage = "https://github.com/pinkpixel-dev/hush"
+readme = "README.md"
+keywords = ["secrets", "dotenv", "env", "encryption", "cli"]
+categories = ["command-line-utilities", "cryptography"]
+exclude = ["icon.png", ".github"]
+
+[[bin]]
+name = "hush"
+path = "src/main.rs"
 
 [dependencies]
 age = "0.12.1"
@@ -24,3 +35,6 @@ zeroize = "1.9.1"
 assert_cmd = "2.2.2"
 predicates = "3.1.4"
 tempfile = "3.27.0"
+
+[profile.release]
+strip = true

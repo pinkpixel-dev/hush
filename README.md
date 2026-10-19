@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="icon.png" alt="hush icon" width="300" height="300">
+  <img src="https://raw.githubusercontent.com/pinkpixel-dev/hush/main/icon.png" alt="hush icon" width="300" height="300">
 </p>
 
 # hush
@@ -30,10 +30,32 @@ The vault is a single [age](https://age-encryption.org)-encrypted file. Its key 
 
 ## Install
 
-Right now you install hush from source, which needs a Rust toolchain:
+### Prebuilt binary
+
+Every [release](https://github.com/pinkpixel-dev/hush/releases) has static Linux binaries for x86_64 and arm64. They don't depend on any system libraries, so they should run on any distro. Download one, check it, and put `hush` somewhere on your `PATH`:
 
 ```bash
-git clone <repo-url> hush
+curl -LO https://github.com/pinkpixel-dev/hush/releases/download/v0.4.0/hush-v0.4.0-x86_64-unknown-linux-musl.tar.gz
+curl -LO https://github.com/pinkpixel-dev/hush/releases/download/v0.4.0/hush-v0.4.0-x86_64-unknown-linux-musl.tar.gz.sha256
+sha256sum -c hush-v0.4.0-x86_64-unknown-linux-musl.tar.gz.sha256
+tar xzf hush-v0.4.0-x86_64-unknown-linux-musl.tar.gz
+install -m 755 hush-v0.4.0-x86_64-unknown-linux-musl/hush ~/.local/bin/hush
+```
+
+On arm64, swap `x86_64` for `aarch64` in those names.
+
+### With cargo
+
+The crate is called `hush-env` (plain `hush` was taken), but the command it installs is still `hush`. You need Rust 1.89 or newer:
+
+```bash
+cargo install hush-env
+```
+
+### From source
+
+```bash
+git clone https://github.com/pinkpixel-dev/hush.git
 cd hush
 cargo install --path .
 ```
