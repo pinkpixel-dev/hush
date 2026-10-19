@@ -78,6 +78,32 @@ fn import_reads_a_dotenv_file() {
 }
 
 #[test]
+fn import_keeps_dollar_signs_as_written() {
+    let s = Sandbox::new();
+    fs::write(s.project.path().join(".env"), "PW=abc$HOME\nURL=\"${PW}/api\"\nPLAIN=1\n").unwrap();
+
+    s.hush(&["import", ".env"])
+        .env("HOME", "/should/not/appear")
+        .assert()
+        .success()
+        .stderr(predicate::str::contains("Kept `$` as written in PW, URL."));
+    s.hush(&["get", "PW"]).assert().success().stdout("abc$HOME\n");
+    s.hush(&["get", "URL"]).assert().success().stdout("${PW}/api\n");
+}
+
+#[test]
+fn import_rejects_a_bad_line_without_saving_anything() {
+    let s = Sandbox::new();
+    fs::write(s.project.path().join(".env"), "A=1\nB=two words\n").unwrap();
+
+    s.hush(&["import", ".env"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("line 2").and(predicate::str::contains("two words").not()));
+    s.hush(&["list"]).assert().success().stdout("");
+}
+
+#[test]
 fn wrong_passphrase_is_rejected() {
     let s = Sandbox::new();
     s.hush(&["list"])

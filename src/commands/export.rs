@@ -54,7 +54,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn quoted_values_round_trip_through_dotenvy() {
+    fn quoted_values_round_trip_through_import() {
         let values = [
             "plain-value_1.2:3@x+y,z=%",
             "",
@@ -74,8 +74,7 @@ mod tests {
         for (i, value) in values.iter().enumerate() {
             file.push_str(&format!("K{i}={}\n", quote(value)));
         }
-        let parsed: Vec<(String, String)> =
-            dotenvy::from_read_iter(file.as_bytes()).map(|item| item.unwrap()).collect();
+        let parsed = crate::dotenv::parse(&file).unwrap();
         assert_eq!(parsed.len(), values.len(), "{file}");
         for (i, value) in values.iter().enumerate() {
             assert_eq!(parsed[i], (format!("K{i}"), value.to_string()), "in:\n{file}");

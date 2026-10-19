@@ -1,5 +1,6 @@
 mod cli;
 mod commands;
+mod dotenv;
 mod exec;
 mod keychain;
 mod names;

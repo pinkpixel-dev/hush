@@ -2,6 +2,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use walkdir::WalkDir;
+use zeroize::Zeroizing;
+
+use crate::dotenv;
 
 /// Folders that are huge or never hold project .env files worth migrating.
 const SKIP_DIRS: &[&str] = &[
@@ -53,14 +56,18 @@ fn is_env_file(name: &str) -> bool {
     }
 }
 
-/// Counts variables without ever printing a value.
+/// Counts variables without ever printing a value. Uses the same parser as
+/// `hush import`, so the count is what an import would bring in.
 fn describe(path: &Path) -> String {
-    match dotenvy::from_path_iter(path) {
-        Ok(iter) => {
-            let count = iter.filter(Result::is_ok).count();
+    let Ok(text) = std::fs::read_to_string(path).map(Zeroizing::new) else {
+        return "unreadable".to_string();
+    };
+    match dotenv::parse(&text) {
+        Ok(pairs) => {
+            let count = pairs.len();
             format!("{count} {}", if count == 1 { "variable" } else { "variables" })
         }
-        Err(_) => "unreadable".to_string(),
+        Err(e) => format!("can't import ({e})"),
     }
 }
 

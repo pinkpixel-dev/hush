@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.1 - Unreleased
+
+### 🐛 Fixes
+
+- `hush import` no longer changes values that contain `$`. The old parser expanded `$VAR` and `${VAR}` from your shell, so `abc$HOME` came in as `abc/home/you` and `pa$word` came in as `pa`. Values now come in exactly as written, and import lists any keys with a `$` in them
+- When `hush import` hits a malformed line, the error now gives the line number only. The old error printed the whole line, value included
+
+### 🔒 Hardening
+
+- hush refuses to open a vault saved in a newer format, instead of opening it and dropping whatever the newer version added on the next save
+- New passphrase vaults need a passphrase of at least 12 characters. Existing vaults aren't affected
+
+### 🧹 Maintenance
+
+- Replaced the `dotenvy` dependency with a small built-in `.env` parser. `hush scan` uses it too, so its counts match what `import` would bring in
+
 ## 0.4.0 - October 19, 2026
 
 ### 🩺 Commands

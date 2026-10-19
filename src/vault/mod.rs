@@ -7,6 +7,9 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
+/// The vault format this build reads and writes.
+pub const VERSION: u32 = 1;
+
 /// Secret name -> value for one project environment.
 pub type Secrets = BTreeMap<String, String>;
 
@@ -19,7 +22,7 @@ pub struct Vault {
 
 impl Vault {
     pub fn new() -> Self {
-        Self { version: 1, projects: BTreeMap::new() }
+        Self { version: VERSION, projects: BTreeMap::new() }
     }
 
     pub fn secrets(&self, project: &str, env: &str) -> Option<&Secrets> {

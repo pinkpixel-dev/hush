@@ -83,6 +83,8 @@ rm .env
 
 hush never deletes your files for you.
 
+Values come in exactly as written. Some dotenv loaders expand `$VAR` or `${VAR}` inside values, but hush doesn't, so a password with a `$` in it stays intact. If any imported values contain `$`, hush lists those keys so you can double-check that none of them were meant as references.
+
 ## Commands
 
 | Command | What it does |
@@ -204,7 +206,7 @@ If there's no keychain available (SSH sessions, WSL, CI, a minimal window manage
 hush init --passphrase
 ```
 
-hush asks for the passphrase each time it opens the vault. For scripts, you can set `HUSH_PASSPHRASE`. hush strips it from the environment before starting your command, so your app never sees it.
+New passphrases need at least 12 characters. hush asks for the passphrase each time it opens the vault. For scripts, you can set `HUSH_PASSPHRASE`. hush strips it from the environment before starting your command, so your app never sees it.
 
 ## Environment variables
 

@@ -8,6 +8,8 @@ use crate::vault::crypto::Key;
 
 const SERVICE: &str = "hush";
 const PASSPHRASE_VAR: &str = "HUSH_PASSPHRASE";
+/// Minimum length for new passphrases. Existing vaults aren't affected.
+const MIN_PASSPHRASE: usize = 12;
 
 /// One keychain entry per vault directory, so `HUSH_DIR` vaults don't collide.
 fn entry(paths: &Paths) -> Result<keyring::Entry> {
@@ -53,14 +55,14 @@ pub fn passphrase() -> Result<SecretString> {
 
 pub fn new_passphrase() -> Result<SecretString> {
     if let Ok(value) = std::env::var(PASSPHRASE_VAR) {
-        if value.is_empty() {
-            bail!("{PASSPHRASE_VAR} is set but empty");
+        if value.chars().count() < MIN_PASSPHRASE {
+            bail!("{PASSPHRASE_VAR} is too short. New passphrases need at least {MIN_PASSPHRASE} characters");
         }
         return Ok(value.into());
     }
     let first = Zeroizing::new(rpassword::prompt_password("New vault passphrase: ")?);
-    if first.is_empty() {
-        bail!("the passphrase can't be empty");
+    if first.chars().count() < MIN_PASSPHRASE {
+        bail!("the passphrase is too short. Use at least {MIN_PASSPHRASE} characters");
     }
     let second = Zeroizing::new(rpassword::prompt_password("Confirm passphrase: ")?);
     if *first != *second {

@@ -6,7 +6,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
-use super::Vault;
+use super::{VERSION, Vault};
 use super::crypto::{self, Key};
 use super::files::{self, create_private_dir, write_atomic};
 use crate::keychain;
@@ -76,8 +76,20 @@ pub fn open(paths: &Paths) -> Result<(Vault, Key)> {
     };
     let ciphertext = fs::read(paths.vault()).context("couldn't read the vault")?;
     let plaintext = crypto::decrypt(&key, &ciphertext)?;
-    let vault = serde_json::from_slice(&plaintext).context("the vault decrypted but its contents are damaged")?;
-    Ok((vault, key))
+    Ok((parse(&plaintext)?, key))
+}
+
+/// Reads decrypted vault JSON. A newer format is refused, since saving it
+/// with this build would silently drop whatever the newer one added.
+fn parse(plaintext: &[u8]) -> Result<Vault> {
+    let vault: Vault = serde_json::from_slice(plaintext).context("the vault decrypted but its contents are damaged")?;
+    if vault.version > VERSION {
+        bail!("this vault was saved by a newer version of hush (format {}). Upgrade hush to open it", vault.version);
+    }
+    if vault.version != VERSION {
+        bail!("the vault decrypted but has an unknown format ({})", vault.version);
+    }
+    Ok(vault)
 }
 
 /// An exclusive lock on the vault, released when dropped. Take it before
@@ -196,7 +208,7 @@ fn unlock_with_recovery(file: &Path, recovery: &x25519::Identity) -> Result<Vaul
     let ciphertext = fs::read(file).with_context(|| format!("couldn't read {}", file.display()))?;
     let plaintext = crypto::decrypt(&Key::Identity(recovery.clone()), &ciphertext)
         .map_err(|_| anyhow!("that recovery key doesn't unlock {}", file.display()))?;
-    serde_json::from_slice(&plaintext).context("the vault decrypted but its contents are damaged")
+    parse(&plaintext)
 }
 
 #[cfg(test)]
@@ -207,6 +219,14 @@ mod tests {
     fn old_configs_without_recovery_still_load() {
         let config: Config = serde_json::from_slice(br#"{ "mode": "keychain" }"#).unwrap();
         assert!(config.recovery().unwrap().is_none());
+    }
+
+    #[test]
+    fn other_vault_formats_are_refused() {
+        assert!(parse(br#"{"version":1,"projects":{}}"#).is_ok());
+        let newer = parse(br#"{"version":2,"projects":{},"extra":true}"#).err().unwrap().to_string();
+        assert!(newer.contains("newer version of hush"), "{newer}");
+        assert!(parse(br#"{"version":0,"projects":{}}"#).err().unwrap().to_string().contains("unknown format"));
     }
 
     #[test]

@@ -193,6 +193,19 @@ fn concurrent_inits_create_exactly_one_vault() {
 }
 
 #[test]
+fn init_refuses_a_short_passphrase() {
+    let data = TempDir::new().unwrap();
+    cargo_bin_cmd!("hush")
+        .args(["init", "--passphrase"])
+        .env("HUSH_DIR", data.path())
+        .env("HUSH_PASSPHRASE", "eleven-char")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("at least 12 characters"));
+    assert!(!data.path().join("vault.age").exists());
+}
+
+#[test]
 fn init_without_a_keychain_points_to_passphrase_mode() {
     let data = TempDir::new().unwrap();
     let hush = |args: &[&str]| {
